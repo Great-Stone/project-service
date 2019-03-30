@@ -7,9 +7,9 @@ import io.vertx.core.Future;
 import io.vertx.ext.mongo.MongoClient;
 import io.vertx.serviceproxy.ProxyHelper;
 
-public class CatalogVerticle extends AbstractVerticle {
+public class ProjectVerticle extends AbstractVerticle {
 
-    private CatalogService service;
+    private ProjectService service;
 
     private MongoClient client;
 
@@ -18,8 +18,8 @@ public class CatalogVerticle extends AbstractVerticle {
 
         client = MongoClient.createShared(vertx, config());
 
-        service = CatalogService.create(vertx, config(), client);
-        ProxyHelper.registerService(CatalogService.class, vertx, service, CatalogService.ADDRESS);
+        service = ProjectService.create(vertx, config(), client);
+        ProxyHelper.registerService(ProjectService.class, vertx, service, ProjectService.ADDRESS);
 
         startFuture.complete();
     }

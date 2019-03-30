@@ -32,6 +32,6 @@ spec:
               memory: 200Mi
           env:
             - name: APP_CONFIGMAP_NAME
-              value: catalog-service
+              value: project-service
             - name: APP_CONFIGMAP_KEY
               value: app-config.yml

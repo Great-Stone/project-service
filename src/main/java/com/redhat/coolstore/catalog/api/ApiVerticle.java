@@ -2,8 +2,8 @@ package com.redhat.coolstore.catalog.api;
 
 import java.util.List;
 
-import com.redhat.coolstore.catalog.model.Product;
-import com.redhat.coolstore.catalog.verticle.service.CatalogService;
+import com.redhat.coolstore.catalog.model.Project;
+import com.redhat.coolstore.catalog.verticle.service.ProjectService;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -17,66 +17,57 @@ import io.vertx.ext.web.handler.BodyHandler;
 
 public class ApiVerticle extends AbstractVerticle {
 
-    private CatalogService catalogService;
+    private ProjectService projectService;
 
-    public ApiVerticle(CatalogService catalogService) {
-        this.catalogService = catalogService;
+    public ApiVerticle(ProjectService projectService) {
+        this.projectService = projectService;
     }
 
     @Override
     public void start(Future<Void> startFuture) throws Exception {
 
         Router router = Router.router(vertx);
-        router.get("/products").handler(this::getProducts);
-        router.get("/product/:itemId").handler(this::getProduct);
-        router.route("/product").handler(BodyHandler.create());
-        router.post("/product").handler(this::addProduct);
+        router.get("/projects").handler(this::getProjects);
+        router.get("/projects/:projectId").handler(this::getProject);
+        router.route("/projects/status/:status").handler(this::getProjectsStatus);
 
-        //Health Checks
+        // Health Checks
         router.get("/health/readiness").handler(rc -> rc.response().end("OK"));
-        HealthCheckHandler healthCheckHandler = HealthCheckHandler.create(vertx)
-                .register("health", f -> health(f));
+        HealthCheckHandler healthCheckHandler = HealthCheckHandler.create(vertx).register("health", f -> health(f));
         router.get("/health/liveness").handler(healthCheckHandler);
 
-        vertx.createHttpServer()
-            .requestHandler(router::accept)
-            .listen(config().getInteger("catalog.http.port", 8080), result -> {
-                if (result.succeeded()) {
-                    startFuture.complete();
-                } else {
-                    startFuture.fail(result.cause());
-                }
-            });
+        vertx.createHttpServer().requestHandler(router::accept).listen(config().getInteger("project.http.port", 8080),
+                result -> {
+                    if (result.succeeded()) {
+                        startFuture.complete();
+                    } else {
+                        startFuture.fail(result.cause());
+                    }
+                });
     }
 
-    private void getProducts(RoutingContext rc) {
-        catalogService.getProducts(ar -> {
+    private void getProjects(RoutingContext rc) {
+        projectService.getProjects(ar -> {
             if (ar.succeeded()) {
-                List<Product> products = ar.result();
+                List<Project> projects = ar.result();
                 JsonArray json = new JsonArray();
-                products.stream()
-                    .map(p -> p.toJson())
-                    .forEach(p -> json.add(p));
-                rc.response()
-                    .putHeader("Content-type", "application/json")
-                    .end(json.encodePrettily());
+                projects.stream().map(p -> p.toJson()).forEach(p -> json.add(p));
+                rc.response().putHeader("Content-type", "application/json").end(json.encodePrettily());
             } else {
                 rc.fail(ar.cause());
             }
         });
     }
 
-    private void getProduct(RoutingContext rc) {
-        String itemId = rc.request().getParam("itemid");
-        catalogService.getProduct(itemId, ar -> {
+    private void getProject(RoutingContext rc) {
+        String projectId = rc.request().getParam("projectId");
+        projectService.getProject(projectId, ar -> {
             if (ar.succeeded()) {
-                Product product = ar.result();
+                Project product = ar.result();
                 JsonObject json;
                 if (product != null) {
                     json = product.toJson();
-                    rc.response()
-                        .putHeader("Content-type", "application/json")
-                        .end(json.encodePrettily());
+                    rc.response().putHeader("Content-type", "application/json").end(json.encodePrettily());
                 } else {
                     rc.fail(404);
                 }
@@ -86,11 +77,14 @@ public class ApiVerticle extends AbstractVerticle {
         });
     }
 
-    private void addProduct(RoutingContext rc) {
-        JsonObject json = rc.getBodyAsJson();
-        catalogService.addProduct(new Product(json), ar -> {
+    private void getProjectsStatus(RoutingContext rc) {
+        int status = Integer.parseInt(rc.request().getParam("status"));
+        projectService.getProjectsStatus(status, ar -> {
             if (ar.succeeded()) {
-                rc.response().setStatusCode(201).end();
+                List<Project> projects = ar.result();
+                JsonArray json = new JsonArray();
+                projects.stream().map(p -> p.toJson()).forEach(p -> json.add(p));
+                rc.response().putHeader("Content-type", "application/json").end(json.encodePrettily());
             } else {
                 rc.fail(ar.cause());
             }
@@ -98,9 +92,10 @@ public class ApiVerticle extends AbstractVerticle {
     }
 
     private void health(Future<Status> future) {
-        catalogService.ping(ar -> {
+        projectService.ping(ar -> {
             if (ar.succeeded()) {
-                // HealthCheckHandler has a timeout of 1000s. If timeout is exceeded, the future will be failed
+                // HealthCheckHandler has a timeout of 1000s. If timeout is exceeded, the future
+                // will be failed
                 if (!future.isComplete()) {
                     future.complete(Status.OK());
                 }

@@ -28,8 +28,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import com.redhat.coolstore.catalog.model.Product;
-import com.redhat.coolstore.catalog.verticle.service.CatalogService;
+import com.redhat.coolstore.catalog.model.Project;
+import com.redhat.coolstore.catalog.verticle.service.ProjectService;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
@@ -47,44 +47,44 @@ public class ApiVerticleTest {
 
     private Vertx vertx;
     private Integer port;
-    private CatalogService catalogService;
+    private ProjectService projectService;
 
     /**
      * Before executing our test, let's deploy our verticle.
      * <p/>
-     * This method instantiates a new Vertx and deploy the verticle. Then, it waits in the verticle has successfully
-     * completed its start sequence (thanks to `context.asyncAssertSuccess`).
+     * This method instantiates a new Vertx and deploy the verticle. Then, it waits
+     * in the verticle has successfully completed its start sequence (thanks to
+     * `context.asyncAssertSuccess`).
      *
      * @param context the test context.
      */
     @Before
     public void setUp(TestContext context) throws IOException {
-      vertx = Vertx.vertx();
+        vertx = Vertx.vertx();
 
-      // Register the context exception handler
-      vertx.exceptionHandler(context.exceptionHandler());
+        // Register the context exception handler
+        vertx.exceptionHandler(context.exceptionHandler());
 
-      // Let's configure the verticle to listen on the 'test' port (randomly picked).
-      // We create deployment options and set the _configuration_ json object:
-      ServerSocket socket = new ServerSocket(0);
-      port = socket.getLocalPort();
-      socket.close();
+        // Let's configure the verticle to listen on the 'test' port (randomly picked).
+        // We create deployment options and set the _configuration_ json object:
+        ServerSocket socket = new ServerSocket(0);
+        port = socket.getLocalPort();
+        socket.close();
 
-      DeploymentOptions options = new DeploymentOptions().setConfig(new JsonObject().put("catalog.http.port", port));
+        DeploymentOptions options = new DeploymentOptions().setConfig(new JsonObject().put("catalog.http.port", port));
 
-      //Mock the catalog Service
-      catalogService = mock(CatalogService.class);
+        // Mock the catalog Service
+        projectService = mock(ProjectService.class);
 
-      // We pass the options as the second parameter of the deployVerticle method.
-      vertx.deployVerticle(new ApiVerticle(catalogService), options, context.asyncAssertSuccess());
+        // We pass the options as the second parameter of the deployVerticle method.
+        vertx.deployVerticle(new ApiVerticle(projectService), options, context.asyncAssertSuccess());
     }
 
     /**
-     * This method, called after our test, just cleanup everything by closing
-     * the vert.x instance
+     * This method, called after our test, just cleanup everything by closing the
+     * vert.x instance
      *
-     * @param context
-     *            the test context
+     * @param context the test context
      */
     @After
     public void tearDown(TestContext context) {
@@ -93,178 +93,124 @@ public class ApiVerticleTest {
 
     @Test
     public void testGetProducts(TestContext context) throws Exception {
-        String itemId1 = "111111";
-        JsonObject json1 = new JsonObject()
-                .put("itemId", itemId1)
-                .put("name", "productName1")
-                .put("desc", "productDescription1")
-                .put("price", new Double(100.0));
-        String itemId2 = "222222";
-        JsonObject json2 = new JsonObject()
-                .put("itemId", itemId2)
-                .put("name", "productName2")
-                .put("desc", "productDescription2")
-                .put("price", new Double(100.0));
-        List<Product> products = new ArrayList<>();
-        products.add(new Product(json1));
-        products.add(new Product(json2));
+        String projectId1 = "111111";
+        JsonObject json1 = new JsonObject().put("projectId", projectId1).put("firstName", "firstName1")
+                .put("lastName", "lastName1").put("email", "email1@redhat.com").put("projectTitle", "projectTitle1")
+                .put("projectDescription", "productDescription1").put("projectStatus", new Integer(1));
+        String projectId2 = "222222";
+        JsonObject json2 = new JsonObject().put("projectId", projectId2).put("firstName", "firstName2")
+                .put("lastName", "lastName2").put("email", "email2@redhat.com").put("projectTitle", "projectTitle2")
+                .put("projectDescription", "productDescription2").put("projectStatus", new Integer(2));
+        List<Project> products = new ArrayList<>();
+        products.add(new Project(json1));
+        products.add(new Project(json2));
         doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
-                Handler<AsyncResult<List<Product>>> handler = invocation.getArgument(0);
+            public Void answer(InvocationOnMock invocation) {
+                Handler<AsyncResult<List<Project>>> handler = invocation.getArgument(0);
                 handler.handle(Future.succeededFuture(products));
                 return null;
-             }
-         }).when(catalogService).getProducts(any());
+            }
+        }).when(projectService).getProjects(any());
 
         Async async = context.async();
-        vertx.createHttpClient().get(port, "localhost", "/products", response -> {
-                assertThat(response.statusCode(), equalTo(200));
-                assertThat(response.headers().get("Content-type"), equalTo("application/json"));
-                response.bodyHandler(body -> {
-                    JsonArray json = body.toJsonArray();
-                    Set<String> itemIds =  json.stream()
-                            .map(j -> new Product((JsonObject)j))
-                            .map(p -> p.getItemId())
-                            .collect(Collectors.toSet());
-                    assertThat(itemIds.size(), equalTo(2));
-                    assertThat(itemIds, allOf(hasItem(itemId1),hasItem(itemId2)));
-                    verify(catalogService).getProducts(any());
-                    async.complete();
-                })
-                .exceptionHandler(context.exceptionHandler());
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+        vertx.createHttpClient().get(port, "localhost", "/projects", response -> {
+            assertThat(response.statusCode(), equalTo(200));
+            assertThat(response.headers().get("Content-type"), equalTo("application/json"));
+            response.bodyHandler(body -> {
+                JsonArray json = body.toJsonArray();
+                Set<String> projectIds = json.stream().map(j -> new Project((JsonObject) j)).map(p -> p.getProjectId())
+                        .collect(Collectors.toSet());
+                assertThat(projectIds.size(), equalTo(2));
+                assertThat(projectIds, allOf(hasItem(projectId1), hasItem(projectId2)));
+                verify(projectService).getProjects(any());
+                async.complete();
+            }).exceptionHandler(context.exceptionHandler());
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
-    public void testGetProduct(TestContext context) throws Exception {
-        String itemId = "111111";
-        JsonObject json = new JsonObject()
-                .put("itemId", itemId)
-                .put("name", "productName1")
-                .put("desc", "productDescription1")
-                .put("price", new Double(100.0));
-        Product product = new Product(json);
+    public void testGetProject(TestContext context) throws Exception {
+        String projectId1 = "111111";
+        JsonObject json = new JsonObject().put("projectId", projectId1).put("firstName", "firstName1")
+                .put("lastName", "lastName1").put("email", "email1@redhat.com").put("projectTitle", "projectTitle1")
+                .put("projectDescription", "productDescription1").put("projectStatus", new Integer(1));
+        Project project = new Project(json);
         doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
-                Handler<AsyncResult<Product>> handler = invocation.getArgument(1);
-                handler.handle(Future.succeededFuture(product));
+            public Void answer(InvocationOnMock invocation) {
+                Handler<AsyncResult<Project>> handler = invocation.getArgument(1);
+                handler.handle(Future.succeededFuture(project));
                 return null;
-             }
-         }).when(catalogService).getProduct(eq("111111"),any());
+            }
+        }).when(projectService).getProject(eq("111111"), any());
 
         Async async = context.async();
-        vertx.createHttpClient().get(port, "localhost", "/product/111111", response -> {
-                assertThat(response.statusCode(), equalTo(200));
-                assertThat(response.headers().get("Content-type"), equalTo("application/json"));
-                response.bodyHandler(body -> {
-                    JsonObject result = body.toJsonObject();
-                    assertThat(result, notNullValue());
-                    assertThat(result.containsKey("itemId"), is(true));
-                    assertThat(result.getString("itemId"), equalTo("111111"));
-                    verify(catalogService).getProduct(eq("111111"),any());
-                    async.complete();
-                })
-                .exceptionHandler(context.exceptionHandler());
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+        vertx.createHttpClient().get(port, "localhost", "/project/111111", response -> {
+            assertThat(response.statusCode(), equalTo(200));
+            assertThat(response.headers().get("Content-type"), equalTo("application/json"));
+            response.bodyHandler(body -> {
+                JsonObject result = body.toJsonObject();
+                assertThat(result, notNullValue());
+                assertThat(result.containsKey("itemId"), is(true));
+                assertThat(result.getString("itemId"), equalTo("111111"));
+                verify(projectService).getProject(eq("111111"), any());
+                async.complete();
+            }).exceptionHandler(context.exceptionHandler());
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
-    public void testGetNonExistingProduct(TestContext context) throws Exception {
+    public void testGetNonExistingProject(TestContext context) throws Exception {
         doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
-                Handler<AsyncResult<Product>> handler = invocation.getArgument(1);
+            public Void answer(InvocationOnMock invocation) {
+                Handler<AsyncResult<Project>> handler = invocation.getArgument(1);
                 handler.handle(Future.succeededFuture(null));
                 return null;
-             }
-         }).when(catalogService).getProduct(eq("111111"),any());
+            }
+        }).when(projectService).getProject(eq("111111"), any());
 
         Async async = context.async();
-        vertx.createHttpClient().get(port, "localhost", "/product/111111", response -> {
-                assertThat(response.statusCode(), equalTo(404));
-                async.complete();
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
-    }
-
-    @Test
-    public void testAddProduct(TestContext context) throws Exception {
-        doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
-                Handler<AsyncResult<String>> handler = invocation.getArgument(1);
-                handler.handle(Future.succeededFuture(null));
-                return null;
-             }
-         }).when(catalogService).addProduct(any(),any());
-
-        Async async = context.async();
-        String itemId = "111111";
-        JsonObject json = new JsonObject()
-                .put("itemId", itemId)
-                .put("name", "productName")
-                .put("desc", "productDescription")
-                .put("price", new Double(100.0));
-        String body = json.encodePrettily();
-        String length = Integer.toString(body.length());
-        vertx.createHttpClient().post(port, "localhost", "/product")
-            .exceptionHandler(context.exceptionHandler())
-            .putHeader("Content-type", "application/json")
-            .putHeader("Content-length", length)
-            .handler(response -> {
-                assertThat(response.statusCode(), equalTo(201));
-                ArgumentCaptor<Product> argument = ArgumentCaptor.forClass(Product.class);
-                verify(catalogService).addProduct(argument.capture(), any());
-                assertThat(argument.getValue().getItemId(), equalTo(itemId));
-                async.complete();
-            })
-            .write(body)
-            .end();
+        vertx.createHttpClient().get(port, "localhost", "/project/111111", response -> {
+            assertThat(response.statusCode(), equalTo(404));
+            async.complete();
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
     public void testLivenessHealthCheck(TestContext context) {
         doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
+            public Void answer(InvocationOnMock invocation) {
                 Handler<AsyncResult<String>> handler = invocation.getArgument(0);
                 handler.handle(Future.succeededFuture("ok"));
                 return null;
-             }
-        }).when(catalogService).ping(any());
+            }
+        }).when(projectService).ping(any());
 
         Async async = context.async();
         vertx.createHttpClient().get(port, "localhost", "/health/liveness", response -> {
-                assertThat(response.statusCode(), equalTo(200));
-                response.bodyHandler(body -> {
-                    JsonObject json = body.toJsonObject();
-                    assertThat(json.toString(), containsString("\"outcome\":\"UP\""));
-                    async.complete();
-                }).exceptionHandler(context.exceptionHandler());
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+            assertThat(response.statusCode(), equalTo(200));
+            response.bodyHandler(body -> {
+                JsonObject json = body.toJsonObject();
+                assertThat(json.toString(), containsString("\"outcome\":\"UP\""));
+                async.complete();
+            }).exceptionHandler(context.exceptionHandler());
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
     public void testFailingLivenessHealthCheck(TestContext context) {
         doAnswer(new Answer<Void>() {
-            public Void answer(InvocationOnMock invocation){
+            public Void answer(InvocationOnMock invocation) {
                 Handler<AsyncResult<Long>> handler = invocation.getArgument(0);
                 handler.handle(Future.failedFuture("error"));
                 return null;
-             }
-         }).when(catalogService).ping(any());
+            }
+        }).when(projectService).ping(any());
 
         Async async = context.async();
         vertx.createHttpClient().get(port, "localhost", "/health/liveness", response -> {
-                assertThat(response.statusCode(), equalTo(503));
-                async.complete();
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+            assertThat(response.statusCode(), equalTo(503));
+            async.complete();
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
@@ -276,32 +222,29 @@ public class ApiVerticleTest {
                 vertx.<String>executeBlocking(f -> {
                     try {
                         Thread.sleep(1100);
-                    } catch (InterruptedException e) {}
+                    } catch (InterruptedException e) {
+                    }
                     f.complete();
                 }, res -> handler.handle(Future.succeededFuture("OK")));
                 return null;
             }
-        }).when(catalogService).ping(any());
+        }).when(projectService).ping(any());
 
         Async async = context.async();
         vertx.createHttpClient().get(port, "localhost", "/health/liveness", response -> {
-                // HealthCheck Timeout returns a 500 status code
-                assertThat(response.statusCode(), equalTo(500));
-                async.complete();
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+            // HealthCheck Timeout returns a 500 status code
+            assertThat(response.statusCode(), equalTo(500));
+            async.complete();
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
     @Test
     public void testReadinessHealthCheck(TestContext context) {
         Async async = context.async();
         vertx.createHttpClient().get(port, "localhost", "/health/readiness", response -> {
-                assertThat(response.statusCode(), equalTo(200));
-                async.complete();
-            })
-            .exceptionHandler(context.exceptionHandler())
-            .end();
+            assertThat(response.statusCode(), equalTo(200));
+            async.complete();
+        }).exceptionHandler(context.exceptionHandler()).end();
     }
 
 }
